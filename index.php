@@ -76,22 +76,36 @@ class RTLer {
                     $components = $value->getListComponents();
                     if (count($components) == 4 && $components[1] instanceof CSS\Value\Size && $components[3] instanceof CSS\Value\Size) {
                         /* @var $components CSS\Value\Size[] */
+                        $neutral = FALSE;
                         $right_size = $components[1]->getSize();
                         $right_unit = $components[1]->getUnit();
                         $components[1]->setSize($components[3]->getSize());
                         $components[1]->setUnit($components[3]->getUnit());
                         $components[1]->setSize($right_size);
                         $components[1]->setUnit($right_unit);
-                        $neutral = FALSE;
                     }
                 }
+                
                 /**
                  * Replace ltr, left to rtl, right both in rule and value
                  * it must not be replaced in the selectors themeselves
                  */
-                $rule->setRule(str_replace(array("left", "right", "swap"), array("swap", "left", "right"), $rule->getRule()));
-                $rule->setValue(str_replace(array("left", "right", "swap"), array("swap", "left", "right"), $rule->getValue()));
-                $rule->setValue(str_replace(array("ltr", "rtl", "swap"), array("swap", "ltr", "rtl"), $rule->getValue()));
+                if(is_int(strpos($rule->getRule(), "left")) || is_int(strpos($rule->getRule(), "right"))){
+                    $neutral = FALSE;
+                    $reset_rule = clone($rule);
+                    $rule->setRule(str_replace(array("left", "right", "swap"), array("swap", "left", "right"), $rule->getRule()));
+                    // reset the defualt rule to auto
+                    $reset_rule->setValue("auto");
+                    $rule_sets->addRule($reset_rule);
+                }
+                if(is_int(strpos($rule->getValue(), "left")) || is_int(strpos($rule->getValue(), "right"))){
+                    $neutral = FALSE;
+                    $rule->setValue(str_replace(array("left", "right", "swap"), array("swap", "left", "right"), $rule->getValue()));
+                }
+                if(is_int(strpos($rule->getValue(), "left")) || is_int(strpos($rule->getValue(), "right"))){
+                    $neutral = FALSE;
+                    $rule->setValue(str_replace(array("ltr", "rtl", "swap"), array("swap", "ltr", "rtl"), $rule->getValue()));
+                }
                 
                 if ($neutral) {
                     $rule_sets->removeRule($rule);
