@@ -74,7 +74,9 @@ class RTLer {
                 $value = $rule->getValue();
                 if ($value instanceof CSS\Value\RuleValueList) {
                     $components = $value->getListComponents();
-                    if (count($components) == 4 && $components[1] instanceof CSS\Value\Size && $components[3] instanceof CSS\Value\Size) {
+                    if($rule->getRule() == "background"){
+                        $this->rtl_background($components);
+                    }elseif (count($components) == 4 && $components[1] instanceof CSS\Value\Size && $components[3] instanceof CSS\Value\Size) {
                         $neutral = FALSE;
                         $this->rtl_4components($components);
                     }
@@ -122,6 +124,14 @@ class RTLer {
         $components[1]->setUnit($components[3]->getUnit());
         $components[3]->setSize($right_size);
         $components[3]->setUnit($right_unit);
+    }
+    
+    /**
+     * 
+     * @param CSS\Value\Value[] $components
+     */
+    public function rtl_background($components) {
+        // if background poition-x is % or px rtl them
     }
 
     /**
