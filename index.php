@@ -47,6 +47,7 @@ class RTLer {
         "margin",
         "border-radius",
         "border",
+        "box-shadow"
             // TODO: complete the list
     );
 
@@ -60,6 +61,34 @@ class RTLer {
         $this->document = $this->parser->parse();
     }
 
+    /**
+     * render the rtled css code, by defualt it will return a string
+     * @param bool $save_to_file if true save the code in a rtl.css file
+     */
+    public function render($save_to_file = false) {
+        return $this->document->render();
+    }
+
+    /**
+     * Loop over the rules and remove any neutral one
+     * If the rule set become empty remove it also!
+     */
+    public function remove_direction_neutral_rules() {
+        foreach ($this->document->getAllRuleSets() as $rule_sets) {
+            /* @var $rule_sets CSS\RuleSet\RuleSet */
+            foreach ($rule_sets->getRules() as $rule) {
+                /* @var $rule CSS\Rule\Rule */
+                $rule_root = explode("-", $rule->getRule())[0];
+                if (!in_array($rule->getRule(), $this->dir_rules) && !in_array($rule_root, $this->dir_rules)) {
+                    $rule_sets->removeRule($rule);
+                }
+            }
+            if (empty($rule_sets->getRules())) {
+                $this->document->remove($rule_sets);
+            }
+        }
+    }
+    
     function rtl() {
         $this->remove_direction_neutral_rules();
 
@@ -75,10 +104,11 @@ class RTLer {
                 if ($value instanceof CSS\Value\RuleValueList) {
                     $components = $value->getListComponents();
                     if($rule->getRule() == "background"){
-                        $this->rtl_background($components);
+                        $neutral = $this->rtl_background($components);
+                    }elseif($rule->getRule() == "box-shadow"){
+                        $neutral = $this->rtl_box_shadow($components);
                     }elseif (count($components) == 4 && $components[1] instanceof CSS\Value\Size && $components[3] instanceof CSS\Value\Size) {
-                        $neutral = FALSE;
-                        $this->rtl_4components($components);
+                        $neutral = $this->rtl_4components($components);
                     }
                 }
 
@@ -124,6 +154,7 @@ class RTLer {
         $components[1]->setUnit($components[3]->getUnit());
         $components[3]->setSize($right_size);
         $components[3]->setUnit($right_unit);
+        return false;
     }
     
     /**
@@ -132,36 +163,24 @@ class RTLer {
      */
     public function rtl_background($components) {
         // if background poition-x is % or px rtl them
+        return false;
     }
 
     /**
-     * Loop over the rules and remove any neutral one
-     * If the rule set become empty remove it also!
+     * 
+     * @param CSS\Value\Value[] $components
      */
-    public function remove_direction_neutral_rules() {
-        foreach ($this->document->getAllRuleSets() as $rule_sets) {
-            /* @var $rule_sets CSS\RuleSet\RuleSet */
-            foreach ($rule_sets->getRules() as $rule) {
-                /* @var $rule CSS\Rule\Rule */
-                $rule_root = explode("-", $rule->getRule())[0];
-                if (!in_array($rule->getRule(), $this->dir_rules) && !in_array($rule_root, $this->dir_rules)) {
-                    $rule_sets->removeRule($rule);
-                }
-            }
-            if (empty($rule_sets->getRules())) {
-                $this->document->remove($rule_sets);
-            }
+    public function rtl_box_shadow($components) {
+        // skip the optional color and multibly the first size value * -1
+        $horizontal_length_value;
+        if(!($components[0] instanceof CSS\Value\Size)){
+            $horizontal_length_value = $components[1];
+        }else{
+            $horizontal_length_value = $components[0];
         }
+        $horizontal_length_value->setSize($horizontal_length_value->getSize()*-1);
+        return false;
     }
-
-    /**
-     * render the rtled css code, by defualt it will return a string
-     * @param bool $save_to_file if true save the code in a rtl.css file
-     */
-    public function render($save_to_file = false) {
-        return $this->document->render();
-    }
-
 }
 
 $rtler = new RTLer();
