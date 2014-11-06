@@ -48,7 +48,7 @@ class RTLer {
         "border-radius",
         "border",
         "box-shadow"
-            // TODO: complete the list
+        // TODO: complete the list
     );
 
     /**
@@ -88,7 +88,7 @@ class RTLer {
             }
         }
     }
-    
+
     function rtl() {
         $this->remove_direction_neutral_rules();
 
@@ -101,14 +101,18 @@ class RTLer {
 
                 /* @var $value CSS\Value\RuleValueList */
                 $value = $rule->getValue();
-                if ($value instanceof CSS\Value\RuleValueList) {
-                    $components = $value->getListComponents();
-                    if($rule->getRule() == "background"){
-                        $neutral = $this->rtl_background($components);
-                    }elseif($rule->getRule() == "box-shadow"){
-                        $neutral = $this->rtl_box_shadow($components);
-                    }elseif (count($components) == 4 && $components[1] instanceof CSS\Value\Size && $components[3] instanceof CSS\Value\Size) {
-                        $neutral = $this->rtl_4components($components);
+                if ($value instanceof CSS\Value\RuleValueList || $value instanceof CSS\Value\CSSFunction) {
+                    if ($rule->getRule() == "background" || $rule->getRule() == "background-position") {
+                        $neutral = $this->rtl_background($value);
+                    } elseif ($rule->getRule() == "box-shadow") {
+                        $neutral = $this->rtl_box_shadow($value);
+                    } elseif ($rule->getRule() == "border-radius") {
+                        $neutral = $this->rtl_border_radius_components($value);
+                    } else {
+                        $components = $value->getListComponents();
+                        if (count($components) == 4 && $components[1] instanceof CSS\Value\Size && $components[3] instanceof CSS\Value\Size) {
+                            $neutral = $this->rtl_four_components($components);
+                        }
                     }
                 }
 
@@ -147,7 +151,7 @@ class RTLer {
      * 
      * @param CSS\Value\Size[] $components
      */
-    function rtl_4components($components) {
+    function rtl_four_components($components) {
         $right_size = $components[1]->getSize();
         $right_unit = $components[1]->getUnit();
         $components[1]->setSize($components[3]->getSize());
@@ -156,31 +160,102 @@ class RTLer {
         $components[3]->setUnit($right_unit);
         return false;
     }
-    
+
+    /**
+     * rtl background position-x and gradient
+     * @param CSS\Value\RuleValueList $value
+     */
+    public function rtl_background($value) {
+        // if background poition-x is % or px rtl them
+        /* @var $components CSS\Value\Size[] */ 
+        $components = $value->getListComponents();
+        foreach ($components as $component){
+            if(is_string($component) && in_array($component, array('left','right'))){
+                // don't do any thing, this will be swaped later
+                return true;
+            }elseif($component instanceof CSS\Value\Size){
+                if($component->getUnit() == "%"){
+                    $component->setSize(100 - $component->getSize());
+                    return false;
+                }elseif($component->getUnit() == "px"){
+                    /** @todo support px background position-x */
+                }
+            }
+        }
+    }
+
     /**
      * 
-     * @param CSS\Value\Value[] $components
+     * @param CSS\Value\RuleValueList $value
      */
-    public function rtl_background($components) {
-        // if background poition-x is % or px rtl them
+    public function rtl_box_shadow($value) {
+        // skip the optional color and multibly the first size value * -1
+        $components = $value->getListComponents();
+        $horizontal_length;
+        if (!($components[0] instanceof CSS\Value\Size)) {
+            $horizontal_length = $components[1];
+        } else {
+            $horizontal_length = $components[0];
+        }
+        $horizontal_length->setSize($horizontal_length->getSize() * -1);
         return false;
     }
 
     /**
      * 
-     * @param CSS\Value\Value[] $components
+     * @param CSS\Value\RuleValueList $value
      */
-    public function rtl_box_shadow($components) {
-        // skip the optional color and multibly the first size value * -1
-        $horizontal_length_value;
-        if(!($components[0] instanceof CSS\Value\Size)){
-            $horizontal_length_value = $components[1];
+    public function rtl_border_radius_components($value) {
+        // border-radius: 25px 10px => 10px 25px
+        /*  @var $components CSS\Value\Size[] */
+        $components = $value->getListComponents();
+        if(count($components) == 2){
+            $top_left = $components[1]->getSize();
+            $top_left_unit = $components[1]->getUnit();
+            $components[1]->setSize($components[0]->getSize());
+            $components[1]->setUnit($components[0]->getUnit());
+            $components[0]->setSize($top_left);
+            $components[0]->setUnit($top_left_unit);
+            return false;
+        }else if(count($components) == 3){
+            // border-radius: 25px 10px 15px => 10px 25px 10px 15px;
+            // swap 1st and 2nd components
+            $top_left = $components[1]->getSize();
+            $top_left_unit = $components[1]->getUnit();
+            $components[1]->setSize($components[0]->getSize());
+            $components[1]->setUnit($components[0]->getUnit());
+            $components[0]->setSize($top_left);
+            $components[0]->setUnit($top_left_unit);
+            // copy 3rd to 4th components
+            $value->addListComponent(clone($components[2]));
+            // copy the 1st components to the 3rd
+            $components[2]->setSize($components[0]->getSize());
+            $components[2]->setUnit($components[0]->getUnit());
+            return false;
+        }else if(count($components) == 4){
+            // border-radius: 25px 10px 15px 8px => 10px 25px 8px 15px;
+            // swap 1st and 2nd components
+            $top_left = $components[1]->getSize();
+            $top_left_unit = $components[1]->getUnit();
+            $components[1]->setSize($components[0]->getSize());
+            $components[1]->setUnit($components[0]->getUnit());
+            $components[0]->setSize($top_left);
+            $components[0]->setUnit($top_left_unit);
+            
+            // swap 3rd and 4th components
+            $buttom_right = $components[3]->getSize();
+            $buttom_right_unit = $components[3]->getUnit();
+            $components[3]->setSize($components[2]->getSize());
+            $components[3]->setUnit($components[2]->getUnit());
+            $components[2]->setSize($buttom_right);
+            $components[2]->setUnit($buttom_right_unit);
+            
+            return false;
         }else{
-            $horizontal_length_value = $components[0];
+            return true;
         }
-        $horizontal_length_value->setSize($horizontal_length_value->getSize()*-1);
-        return false;
     }
+
 }
 
 $rtler = new RTLer();
