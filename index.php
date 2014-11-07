@@ -57,7 +57,7 @@ class RTLer {
      */
     function __construct($file = "style.css") {
         $this->origenl_css = file_get_contents($file);
-        $this->parser = new CSS\Parser($this->origenl_css);
+        $this->parser = new CSS\Parser($this->origenl_css,CSS\Settings::create()->withMultibyteSupport(false));
         $this->document = $this->parser->parse();
     }
 
@@ -66,7 +66,7 @@ class RTLer {
      * @param bool $save_to_file if true save the code in a rtl.css file
      */
     public function render($save_to_file = false) {
-        return $this->document->render();
+        return $this->document->render(CSS\OutputFormat::createPretty());
     }
 
     /**
@@ -92,7 +92,6 @@ class RTLer {
     function rtl() {
         $this->remove_direction_neutral_rules();
 
-        // TODO: loop over the rule and rtl it
         foreach ($this->document->getAllRuleSets() as $rule_sets) {
             /* @var $rule_sets CSS\RuleSet\RuleSet */
             foreach ($rule_sets->getRules() as $rule) {
@@ -101,7 +100,7 @@ class RTLer {
 
                 /* @var $value CSS\Value\RuleValueList */
                 $value = $rule->getValue();
-                if ($value instanceof CSS\Value\RuleValueList || $value instanceof CSS\Value\CSSFunction) {
+                if ($value instanceof CSS\Value\RuleValueList) {
                     if ($rule->getRule() == "background" || $rule->getRule() == "background-position") {
                         $neutral = $this->rtl_background($value);
                     } elseif ($rule->getRule() == "box-shadow") {
@@ -110,7 +109,7 @@ class RTLer {
                         $neutral = $this->rtl_border_radius_components($value);
                     } else {
                         $components = $value->getListComponents();
-                        if (count($components) == 4 && $components[1] instanceof CSS\Value\Size && $components[3] instanceof CSS\Value\Size) {
+                        if (count($components) == 4) {
                             $neutral = $this->rtl_four_components($components);
                         }
                     }
@@ -122,11 +121,15 @@ class RTLer {
                  */
                 if (is_int(strpos($rule->getRule(), "left")) || is_int(strpos($rule->getRule(), "right"))) {
                     $neutral = FALSE;
-                    $reset_rule = clone($rule);
-                    $rule->setRule(str_replace(array("left", "right", "swap"), array("swap", "left", "right"), $rule->getRule()));
-                    // reset the defualt rule to auto
-                    $reset_rule->setValue("auto");
-                    $rule_sets->addRule($reset_rule);
+                    $swaped_rule = str_replace(array("left", "right", "swap"), array("swap", "left", "right"), $rule->getRule());
+                    $current_rules = $rule_sets->getRules($swaped_rule);
+                    $reset_rule = (empty($current_rules))? clone($rule) : FALSE;
+                    $rule->setRule($swaped_rule);
+                    // reset the defualt rule to auto if not exists already
+                    if($reset_rule){
+                        $reset_rule->setValue("initial");
+                        $rule_sets->addRule($reset_rule);
+                    }
                 }
                 if (is_int(strpos($rule->getValue(), "left")) || is_int(strpos($rule->getValue(), "right"))) {
                     $neutral = FALSE;
@@ -141,6 +144,7 @@ class RTLer {
                     $rule_sets->removeRule($rule);
                 }
             }
+            
             if (empty($rule_sets->getRules())) {
                 $this->document->remove($rule_sets);
             }
