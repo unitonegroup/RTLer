@@ -48,7 +48,7 @@ class RTLer {
         "border-radius",
         "border",
         "box-shadow"
-        // TODO: complete the list
+            // TODO: complete the list
     );
 
     /**
@@ -57,7 +57,7 @@ class RTLer {
      */
     function __construct($file = "style.css") {
         $this->origenl_css = file_get_contents($file);
-        $this->parser = new CSS\Parser($this->origenl_css,CSS\Settings::create()->withMultibyteSupport(false));
+        $this->parser = new CSS\Parser($this->origenl_css, CSS\Settings::create()->withMultibyteSupport(false));
         $this->document = $this->parser->parse();
     }
 
@@ -85,6 +85,22 @@ class RTLer {
             }
             if (empty($rule_sets->getRules())) {
                 $this->document->remove($rule_sets);
+            }
+        }
+    }
+    
+    public function remove_empty_rulelist() {
+        foreach ($this->document->getContents() as $item) {
+            if ($item instanceof CSS\CSSList\AtRuleBlockList) {
+                /* @var $item CSS\CSSList\AtRuleBlockList */
+                foreach ($item->getContents() as $rule_sets) {
+                    if (empty($rule_sets->getRules())) {
+                        $item->remove($rule_sets);
+                    }
+                }
+                if (empty($item->getContents())) {
+                    $this->document->remove($item);
+                }
             }
         }
     }
@@ -123,10 +139,10 @@ class RTLer {
                     $neutral = FALSE;
                     $swaped_rule = str_replace(array("left", "right", "swap"), array("swap", "left", "right"), $rule->getRule());
                     $current_rules = $rule_sets->getRules($swaped_rule);
-                    $reset_rule = (empty($current_rules))? clone($rule) : FALSE;
+                    $reset_rule = (empty($current_rules)) ? clone($rule) : FALSE;
                     $rule->setRule($swaped_rule);
                     // reset the defualt rule to auto if not exists already
-                    if($reset_rule){
+                    if ($reset_rule) {
                         $reset_rule->setValue("initial");
                         $rule_sets->addRule($reset_rule);
                     }
@@ -144,11 +160,13 @@ class RTLer {
                     $rule_sets->removeRule($rule);
                 }
             }
-            
+
             if (empty($rule_sets->getRules())) {
                 $this->document->remove($rule_sets);
             }
         }
+
+        $this->remove_empty_rulelist();
     }
 
     /**
@@ -171,17 +189,17 @@ class RTLer {
      */
     public function rtl_background($value) {
         // if background poition-x is % or px rtl them
-        /* @var $components CSS\Value\Size[] */ 
+        /* @var $components CSS\Value\Size[] */
         $components = $value->getListComponents();
-        foreach ($components as $component){
-            if(is_string($component) && in_array($component, array('left','right'))){
+        foreach ($components as $component) {
+            if (is_string($component) && in_array($component, array('left', 'right'))) {
                 // don't do any thing, this will be swaped later
                 return true;
-            }elseif($component instanceof CSS\Value\Size){
-                if($component->getUnit() == "%"){
+            } elseif ($component instanceof CSS\Value\Size) {
+                if ($component->getUnit() == "%") {
                     $component->setSize(100 - $component->getSize());
                     return false;
-                }elseif($component->getUnit() == "px"){
+                } elseif ($component->getUnit() == "px") {
                     /** @todo support px background position-x */
                 }
             }
@@ -213,7 +231,7 @@ class RTLer {
         // border-radius: 25px 10px => 10px 25px
         /*  @var $components CSS\Value\Size[] */
         $components = $value->getListComponents();
-        if(count($components) == 2){
+        if (count($components) == 2) {
             $top_left = $components[1]->getSize();
             $top_left_unit = $components[1]->getUnit();
             $components[1]->setSize($components[0]->getSize());
@@ -221,7 +239,7 @@ class RTLer {
             $components[0]->setSize($top_left);
             $components[0]->setUnit($top_left_unit);
             return false;
-        }else if(count($components) == 3){
+        } else if (count($components) == 3) {
             // border-radius: 25px 10px 15px => 10px 25px 10px 15px;
             // swap 1st and 2nd components
             $top_left = $components[1]->getSize();
@@ -236,7 +254,7 @@ class RTLer {
             $components[2]->setSize($components[0]->getSize());
             $components[2]->setUnit($components[0]->getUnit());
             return false;
-        }else if(count($components) == 4){
+        } else if (count($components) == 4) {
             // border-radius: 25px 10px 15px 8px => 10px 25px 8px 15px;
             // swap 1st and 2nd components
             $top_left = $components[1]->getSize();
@@ -245,7 +263,7 @@ class RTLer {
             $components[1]->setUnit($components[0]->getUnit());
             $components[0]->setSize($top_left);
             $components[0]->setUnit($top_left_unit);
-            
+
             // swap 3rd and 4th components
             $buttom_right = $components[3]->getSize();
             $buttom_right_unit = $components[3]->getUnit();
@@ -253,15 +271,17 @@ class RTLer {
             $components[3]->setUnit($components[2]->getUnit());
             $components[2]->setSize($buttom_right);
             $components[2]->setUnit($buttom_right_unit);
-            
+
             return false;
-        }else{
+        } else {
             return true;
         }
     }
 
 }
 
-$rtler = new RTLer();
+$rtler = new RTLer("bootstrap.css");
 $rtler->rtl();
+echo "<pre>";
 echo $rtler->render();
+echo "</pre>";
