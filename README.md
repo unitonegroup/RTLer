@@ -11,4 +11,5 @@ RTL any CSS file (CSS3 supported)
 1. support custom format CSS3 (box-shadow and border-radius)
 
 ## Notes
+1. the CSS file must be vaild before using the rtler (http://validator.w3.org/)
 1. if the original file did not include dir:ltr, add dir:rtl to the body tag
